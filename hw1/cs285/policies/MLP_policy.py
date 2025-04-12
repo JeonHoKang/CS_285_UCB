@@ -128,9 +128,14 @@ class MLPPolicySL(BasePolicy, nn.Module, metaclass=abc.ABCMeta):
         # You can return anything you want, but you should be able to differentiate
         # through it. For example, you can return a torch.FloatTensor. You can also
         # return more flexible objects, such as a
-        # `torch.distributions.Distribution` object. It's up to you!
-        raise NotImplementedError
+        # `torch.distributions.Distribution` object. It's up to you!   
+        mu = self.mean_net(observation)
+        normal_dist = distributions.Normal(mu, torch.exp(self.logstd))
+        action_sampled = normal_dist.rsample()
+        # assert observation.shape[0] == action_sampled.shape[0], 'same batch size'
 
+        return action_sampled
+    
     def update(self, observations, actions):
         """
         Updates/trains the policy
@@ -141,7 +146,16 @@ class MLPPolicySL(BasePolicy, nn.Module, metaclass=abc.ABCMeta):
             dict: 'Training Loss': supervised learning loss
         """
         # TODO: update the policy and return the loss
-        loss = TODO
+        assert observations.shape[0] == actions.shape[0], "Observation should be the same batch size as actions"
+        observations, actions = ptu.from_numpy(observations), ptu.from_numpy(actions)
+
+
+        actions_policy = self.forward(observations)
+        loss = F.mse_loss(actions_policy, actions)
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+        
         return {
             # You can add extra logging information here, but keep this line
             'Training Loss': ptu.to_numpy(loss),

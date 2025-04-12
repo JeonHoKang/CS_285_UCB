@@ -19,7 +19,10 @@ from cs285.infrastructure.logger import Logger
 from cs285.infrastructure.replay_buffer import ReplayBuffer
 from cs285.policies.MLP_policy import MLPPolicySL
 from cs285.policies.loaded_gaussian_policy import LoadedGaussianPolicy
-
+print(torch.__version__)
+print(torch.version.cuda)
+print(torch.cuda.get_arch_list())
+print(torch.cuda.get_device_name(0))
 
 # how many rollouts to save as videos to tensorboard
 MAX_NVIDEO = 2
@@ -48,11 +51,11 @@ def run_training_loop(params):
     seed = params['seed']
     np.random.seed(seed)
     torch.manual_seed(seed)
-    ptu.init_gpu(
+    gpu = ptu.init_gpu(
         use_gpu=not params['no_gpu'],
         gpu_id=params['which_gpu']
     )
-
+    # print(gpu)
     # Set logger attributes
     log_video = True
     log_metrics = True
@@ -64,7 +67,7 @@ def run_training_loop(params):
     # Make the gym environment
     env = gym.make(params['env_name'], render_mode=None)
     env.reset(seed=seed)
-
+    # env.render()
     # Maximum length for episodes
     params['ep_len'] = params['ep_len'] or env.spec.max_episode_steps
     MAX_VIDEO_LEN = params['ep_len']
@@ -150,6 +153,7 @@ def run_training_loop(params):
         # train agent (using sampled data from replay buffer)
         print('\nTraining agent using sampled data from replay buffer...')
         training_logs = []
+        loss_train = []
         for _ in range(params['num_agent_train_steps_per_iter']):
 
           # TODO: sample some data from replay_buffer
@@ -157,12 +161,20 @@ def run_training_loop(params):
           # HINT2: use np.random.permutation to sample random indices
           # HINT3: return corresponding data points from each array (i.e., not different indices from each array)
           # for imitation learning, we only need observations and actions.  
-          ob_batch, ac_batch = TODO
+          random_ind = np.random.permutation(len(replay_buffer.obs))[:params['train_batch_size']]
+          ob_batch, ac_batch = replay_buffer.obs[random_ind], replay_buffer.acs[random_ind]
 
           # use the sampled data to train an agent
           train_log = actor.update(ob_batch, ac_batch)
           training_logs.append(train_log)
-
+          loss_train.append(train_log['Training Loss'])
+        # import matplotlib.pyplot as plt
+        # plt.plot(range(params['num_agent_train_steps_per_iter']), loss_train)
+        # plt.xlabel('epoch')
+        # plt.ylabel('loss')
+        # plt.xticks()
+        # plt.yticks()
+        # plt.show()
         # log/save
         print('\nBeginning logging procedure...')
         if log_video:
